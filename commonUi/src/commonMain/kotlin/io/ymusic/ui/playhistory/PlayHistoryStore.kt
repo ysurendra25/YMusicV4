@@ -56,6 +56,37 @@ class PlayHistoryStore(
         _changes.tryEmit(Unit)
     }
 
+    /** The most recently played YouTube video ids, newest first — a radio excludes them to stay fresh. */
+    suspend fun youtubeRecentVideoIds(limit: Int = RECENT_FOR_FRESH): List<String> = withContext(io) {
+        queryIds("SELECT video_id FROM yt_play_history ORDER BY tracked_at DESC LIMIT ?", limit)
+    }
+
+    /** The artists with the most total watch time — the taste signal a radio ranks toward. */
+    suspend fun topArtists(limit: Int = TOP_ARTISTS): Set<String> = withContext(io) {
+        queryIds(
+            """
+            SELECT m.artist FROM yt_video_metadata m
+            JOIN yt_play_history h ON h.video_id = m.video_id
+            WHERE m.artist IS NOT NULL AND m.artist <> ''
+            GROUP BY m.artist
+            ORDER BY SUM(h.watch_time) DESC
+            LIMIT ?
+            """.trimIndent(),
+            limit,
+        ).toSet()
+    }
+
+    /** Cumulative watch time recorded for [videoId]; 0 when it was never played. */
+    suspend fun youtubeWatchTimeMs(videoId: String): Long = withContext(io) {
+        if (videoId.isEmpty()) return@withContext 0L
+        driver.executeQuery(
+            null,
+            "SELECT watch_time FROM yt_play_history WHERE video_id = ?",
+            { cursor -> QueryResult.Value(if (cursor.next().value) cursor.getLong(0) ?: 0L else 0L) },
+            1,
+        ) { bindString(0, videoId) }.value
+    }
+
     /** Snapshot for the Discover chart. Live streams are skipped; a thin card only inserts if missing. */
     suspend fun saveYoutubeMetadata(
         videoId: String,
@@ -274,6 +305,8 @@ class PlayHistoryStore(
     companion object {
         const val DEFAULT_RETAIN = 200
         const val METADATA_QUOTA = 100
+        const val RECENT_FOR_FRESH = 40
+        const val TOP_ARTISTS = 15
         private const val METADATA_CLEANUP_EVERY = 10
     }
 }

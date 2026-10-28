@@ -173,6 +173,16 @@ object AppSettings {
     val downloadMp3SourceBitrate = BoolSetting("download.mp3SourceBitrate", false)
 
     /**
+     * Download a track automatically once its cumulative watch time passes
+     * [autoDownloadTopPlayedMinutes]. Off by default: it writes files to the user's disk
+     * without being asked, so it is never on unless they turn it on.
+     */
+    val autoDownloadTopPlayed = BoolSetting("download.autoTopPlayed", false)
+
+    /** The cumulative watch time, in minutes, that makes a track "most played" for [autoDownloadTopPlayed]. */
+    val autoDownloadTopPlayedMinutes = IntSetting("download.autoTopPlayedMinutes", 30)
+
+    /**
      * Skip SponsorBlock segments on YouTube items. Default on; a per-video whitelist still
      * excludes individual videos.
      */

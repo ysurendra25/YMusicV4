@@ -738,4 +738,6 @@
     <string name="download_other_format">Download in another format</string>
     <string name="unsubscribe">Unsubscribe</string>
     <string name="unsubscribed">Unsubscribed</string>
+    <string name="settings_auto_download_top_played">Auto-download most played</string>
+    <string name="settings_auto_download_top_played_hint">Download a song automatically once you have listened to it for a while</string>
 </resources>

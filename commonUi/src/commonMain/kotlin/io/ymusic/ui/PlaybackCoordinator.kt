@@ -41,6 +41,7 @@ class PlaybackCoordinator(
     private val log = graph.logger?.fork("player")
     private val playHistory = graph.playHistory
     private val mediaStore = graph.mediaStore
+    private val autoDownloader = AutoDownloader(graph)
 
     init {
         // The player surfaces failure as state, not a throw — this transition IS the job-death
@@ -143,12 +144,29 @@ class PlaybackCoordinator(
         )
     }
 
-    /** Play [video] now with its radio (a YouTube Mix) as the rest of the queue, loading as it plays;
-     *  its related videos when YouTube has no radio for it. */
+    /**
+     * Play [video] now with its radio (a YouTube Mix) as the rest of the queue, loading as it plays;
+     * its related videos when YouTube has no radio for it. The queue stays RELATED — it is YouTube's
+     * mix for this track — while staying FRESH: recent plays are skipped, and the user's own artists
+     * (plus the seed's artist) are interleaved through YouTube's order instead of replacing it.
+     */
     fun playNow(video: YtFeedItem) {
+        val history = playHistory
+        val exclude: (suspend () -> Set<String>)? = history?.let { h ->
+            suspend { h.youtubeRecentVideoIds().toSet() }
+        }
+        val preferArtists: (suspend () -> Set<String>)? = history?.let { h ->
+            suspend { h.topArtists() + listOfNotNull(video.channelTitle) }
+        }
         player.setQueue(
             listOf(video.toYtMedia()),
-            source = NextQueueSource.radio(graph.engines, video.id, log?.fork("queue-source")),
+            source = NextQueueSource.radio(
+                graph.engines,
+                video.id,
+                log?.fork("queue-source"),
+                exclude,
+                preferArtists,
+            ),
         )
     }
 
@@ -251,6 +269,7 @@ class PlaybackCoordinator(
                     live = item.live,
                 )
                 history.trackYoutube(item.videoId, watchTimeMs)
+                autoDownloader.onWatchTimeRecorded(item, history)
             }
         }
     }
